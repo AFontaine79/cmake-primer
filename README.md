@@ -29,6 +29,27 @@ Let's unpack that a bit.  CMake is not the build system itself.  It generates bu
 
 CMake is designed only to be rerun as needed.  Once the build files are generated, it is necessary only to invoke the targeted build system (e.g. make or ninja).  The generated build files include dependencies that will rerun CMake _only as needed_.  That is, if you modify the CMakeLists.txt *.cmake files, the CMake command will be rerun, otherwise it will not be.  Furthermore, information about the configuration is cached in the CMakeCache.txt file in your build output folder.  All of this serves to make CMake fast and fully supportive of incremental builds.
 
+## Targets and Properties
+CMake is a language that is used to describe build targets.  That's its purpose.  These targets are mainly libraries and executables that are created with the `add_library()` and `add_executable()` commands respectively.  Each target has _properties_.  These properties specify how the target is built.
+
+![Build Specification Properties](resources/CMake-Target-Properties.drawio.png)
+
+> **Note:** [Properties](https://cmake.org/cmake/help/v3.23/manual/cmake-properties.7.html) are different than [variables](https://cmake.org/cmake/help/v3.23/manual/cmake-variables.7.html).  Properties are always attached to an object, such as directory, test or target (but primarily a target).  Variables have no such attachment and have general visibility to the script.  Sometimes a property is initialized by a variable.  For example, the C_STANDARD property of a target will be initialized by the CMAKE_C_STANDARD variable if it exists when the target is created.
+
+Properties on targets can be broadly classified into two categories: [build specifications and usage requirements](https://cmake.org/cmake/help/v3.23/manual/cmake-buildsystem.7.html#build-specification-and-usage-requirements).
+- **Build Specifications** - Specifies how the target should be built.  This includes compiler flags, preprocessor macros, include directories, source files, and so forth.
+- **Usage Requirements** - Specifies _additional_ properties needed by _dependents_ of this target.  This would mainly apply to libraries, not executables.  This would be things like include directories or compiler flags needed by a dependent target to correctly link against this target.
+
+When we add properties to a target, we can choose whether those properties apply to the _build specifications_, the _usage requirements_, or both.  We do this using the PUBLIC, PRIVATE, and INTERFACE keywords.  This diagram shows the use of the `target_include_directories()` command to set both public and private include directores.
+
+![Public and Private Properties](resources/CMake-Interface-Properties.drawio.png)
+
+In this example, `src/include` and `include` are build specifications.  They will be used when building the library.  `include` and `utility/macros` are usage requirements.  They will be used by dependents that link against this library.  Note that usage requirement properties are the same as build specification properties except with the leading `INTERFACE_`.  The PUBLIC, PRIVATE, and INTERFACE keywords can be applied to most properties, not just compiler options and include directories.
+
+We can summarize these keywords as follows.  For demonstration purposes we indicate which properties would be set by the `target_include_directories()` command:
+- **PRIVATE:** This is a build specification only.  It will apply to the build of this target but not its dependents.  Only `INCLUDE_DIRECTORIES` is set.
+- **PUBLIC:** This is both a build specification and a usage requirement.  It applies to build of this target and any of its dependents.  Both `INCLUDE_DIRECTORIES` and `INTERFACE_INCLUDE_DIRECTORIES` are set.
+- **INTERFACE:** This is a usage requirement only.  It is not needed to build this target, but any dependents of this target will require it.  Only `INTERFACE_INCLUDE_DIRECTORIES` is set.
 
 -----
 Copyright &copy; 2022 Aaron Fontaine
