@@ -29,6 +29,39 @@ Let's unpack that a bit.  CMake is not the build system itself.  It generates bu
 
 CMake is designed only to be rerun as needed.  Once the build files are generated, it is necessary only to invoke the targeted build system (e.g. make or ninja).  The generated build files include dependencies that will rerun CMake _only as needed_.  That is, if you modify the CMakeLists.txt *.cmake files, the CMake command will be rerun, otherwise it will not be.  Furthermore, information about the configuration is cached in the CMakeCache.txt file in your build output folder.  All of this serves to make CMake fast and fully supportive of incremental builds.
 
+## Prereqs
+Before reading further, go and finish [LLVM's CMake Primer](https://llvm.org/docs/CMakePrimer.html).  It's pretty short and covers some of the basics around language syntax.  The rest of this guide is devoted to clearing up common confusions people encounter when using CMake.  It should be read _after_ the simple primer and _before_ more any more advanced CMake courses.
+
+## Variables, Quoting, Functions and Lists
+Knowing that all variables are strings is fine and dandy.  Knowing that lists are string variables with `;` separators is great too.  It seems straightforward, until you start reading other CMake and doing some of your own.  Suddenly, questions start to crop up, such as [_when exactly am I supposed to be quoting variable dereferences anyway?_](https://stackoverflow.com/questions/13582282/cmake-difference-between-and)  Is there some kind of rule or something, because _I don't get it!_
+
+Let's clear this up.  There are a few important things to understand about how the CMake language operates that are, well, about _as clear as mud_ in the official CMake documentation.  You won't be able to understand this until you know specifically how each of the four items (variables, quoting, function parameters, and lists) are treated.
+
+First, all variables are treated the same.  That is to say, derefencing a variable using `${}` operates exactly the same whether its string value contains `;`s or not.  It's how some _commands_ treat string values that matters.  It's almost as if lists aren't even part of the base language but rather the scripting commands defined on top of it.
+
+Second, as far as function arguments are concerned, `;`s are just as good a separator as space.  The [language specification for command invocations](https://cmake.org/cmake/help/v3.23/manual/cmake-language.7.html#command-invocations) would not have you believe this.  In fact, that definition seems to deny that `;` can be an argument separator.  Read carefully the [documentation for unquoted arguments](https://cmake.org/cmake/help/v3.23/manual/cmake-language.7.html#unquoted-argument).  It says
+
+> Both Escape Sequences and Variable References are evaluated. The resulting value is divided in the same way Lists divide into elements. Each non-empty element is given to the command invocation as an argument. Therefore an unquoted argument may be given to a command invocation as zero or more arguments.
+
+Note these statements: _The resulting value is divided in the same way lists divide into elements._ ...and... _Each non-empty element is given to the command invocation as an argument._  So, in other words, a dereferenced list variable will be separated into separate elements first and then each of these will be given to the function as a separate argument.  But, here's the thing... _you don't even need to derference a variable to accomplish this behavior_.  The following two invocations of `foo()` are equivalent.
+
+```
+function(foo a b c)
+	message(STATUS a)
+	message(STATUS b)
+	message(STATUS c)
+end_function()
+
+foo(1 2 3)
+foo(1;2;3)
+```
+
+This is what I mean by saying that whether a variable is a list is irrelevant to the dereference operator.  Where that resulting string is placed determines how it is processed.
+
+The third thing to know is that quoting guarantees that a set of characters behaves as one argument.  It will not split on a space or `;`.  That's its main purpose.  Quoting does not prevent variable dereferences or escape sequences.  Thus, if you have a list variable that you want to behave as one argument, you must provide it as a quoted argument (e.g. `foo("${my_list}")`).
+
+
+
 ## Targets and Properties
 CMake is a language that is used to describe build targets.  That's its purpose.  These targets are mainly libraries and executables that are created with the `add_library()` and `add_executable()` commands respectively.  Each target has _properties_.  These properties specify how the target is built.
 
@@ -50,6 +83,34 @@ We can summarize these keywords as follows.  For demonstration purposes we indic
 - **PRIVATE:** This is a build specification only.  It will apply to the build of this target but not its dependents.  Only `INCLUDE_DIRECTORIES` is set.
 - **PUBLIC:** This is both a build specification and a usage requirement.  It applies to build of this target and any of its dependents.  Both `INCLUDE_DIRECTORIES` and `INTERFACE_INCLUDE_DIRECTORIES` are set.
 - **INTERFACE:** This is a usage requirement only.  It is not needed to build this target, but any dependents of this target will require it.  Only `INTERFACE_INCLUDE_DIRECTORIES` is set.
+
+## Target Link Libraries
+Now it's time to talk about how the usage requirements of a target are applied to its dependents.  This happens through the `target_link_libraries()` command.  `target_link_libraries()` is used to declare one or more dependencies of a target.  Personally, I find the documentation for `target_link_libraries()` hard to follow, and I hope to clear up that confusion here.
+
+Here is the signature for `target_link_libraries()`:
+```
+target_link_libraries(<target>
+                      <PRIVATE|PUBLIC|INTERFACE> <item>...
+                     [<PRIVATE|PUBLIC|INTERFACE> <item>...]...)
+```
+
+And here is how the CMake documentation describes it:
+
+> The `PUBLIC`, `PRIVATE` and `INTERFACE` keywords can be used to specify both the link dependencies and the link interface in one command. Libraries and targets following `PUBLIC` are linked to, and are made part of the link interface. Libraries and targets following `PRIVATE` are linked to, but are not made part of the link interface. Libraries following `INTERFACE` are appended to the link interface and are not used for linking `<target>`.
+
+Note that we are using different terminology now.  The terms _build specifications_ and _usage requirements_ are notably absent, which is odd considering the page itself starts out talking about _usage requirements_.  Let's clear that up.
+
+When the doc says _linked to_, it is referring to a _build specification_.  It means the build specification properties of `<target>` are being set.  When the doc says _made part of the link interface_, it is referring to a _usage requirement_.  It means the usage requirement properties of `<target>` are being set.  Put another way, the _usage requirement_ of the dependency becomes a _usage requirement_ of `<target>`.  This is called a "transitive link dependency".  It means the usage requirements are being passed transitively across the dependency chain.
+
+This diagram shows the propogation of usage requirements from the library to the dependent target.
+
+![Target Link Libraries](resources/CMake-Link-Libraries.drawio.png)
+
+Note that the private build specifications of the dependency are never seen by the dependent target.  Only the usage requirements are seen (i.e. the properties starting with `INTERFACE_`).  This works on a property-by-property basis.  So, for example, all macros defined in `INTERFACE_COMPILE_DEFINITIONS` of the library will be added to `COMPILE_DEFINITIONS`, `INTERFACE_COMPILE_DEFINITIONS` or both of the target depending on whether the library dependency was added as `PUBLIC`, `PRIVATE` or `INTERFACE`.
+
+In addition to copying properties from the dependency, `target_link_libraries()` will also create the `LINK_LIBRARIES` and/or `INTERFACE_LINK_LIBRARIES` properties on the target.
+
+
 
 -----
 Copyright &copy; 2022 Aaron Fontaine
