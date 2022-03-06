@@ -1,6 +1,6 @@
 CMake Primer
 ------------------
-The goal of this primer is to give an overview of some of the important concepts of CMake.  CMake is a complex tool and it is easy to get lost in the noise.  By having a firm grasp of it's operation, your learning process should be much easier.  However, this primer is not a complete beginner's guide.  It defers to LLVM's CMake Primer, and then follows up to clear up some common points of confusion.  It is recommended to review this material before moving on to more advanced resources.
+The goal of this primer is to cover some of the pain points I struggled with learning CMake.  It is not a full or comprehensive primer.  Nor is it a starting point.  For the basic overview of CMake, I suggest [LLVM's CMake Primer](https://llvm.org/docs/CMakePrimer.html).  However, I do recommend reading this primer along with doing some of your own experimentation before going on to more advanced material.
 
 ## Table of Contents
 
