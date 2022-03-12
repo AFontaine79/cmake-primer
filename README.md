@@ -10,6 +10,10 @@ The goal of this primer is to cover some of the pain points I struggled with lea
 - [Variables, Quoting, Functions and Lists](#variables-quoting-functions-and-lists)
 - [Targets and Properties](#targets-and-properties)
 - [Target Link Libraries](#target-link-libraries)
+- [Toolchain Files](#toolchain-files)
+- [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-Linker-and-binutils)
+- [Specifying the Target System and Processor](#specifying-the-target-system-and-processor)
+- [Specifying the Build Configuration](#specifying-the-build-configuration)
 
 ## Motivation for CMake
 Ugh, what's this?  Yet another build system?  Is this just another _hot new thing_ that everyone is going to forget about in 5 years?  Why should _I_ learn this?  What's in it _for me_?
@@ -127,7 +131,82 @@ In addition to copying properties from the dependency, `target_link_libraries()`
 **[Back to top](#table-of-contents)**
 
 ## Toolchain Files
-_Content not yet written._
+In addition to the build system (`make`, `ninja`, etc.), CMake needs to know the toolchain it is using.
+
+> CMake uses a toolchain of utilities to compile, link libraries and create archives, and other tasks to drive the build.
+
+For those familiar with GNU family of compilers, this would be gcc plus [binutils](https://sourceware.org/binutils/).  This is what you get when you download the [GNU ARM Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads).
+
+If you do not specify a toolchain, CMake will determine your toolchain based on common defaults (`MSVC` on Windows, `Clang` on Mac OS, etc.).  When cross-compiling, we need to specify the toolchain so that CMake knows how to build for our target hardware.  To do this, CMake _wants_ us to use a toolchain file, _and_ it wants this toolchain file to be provided on the command line.  We do this as follows:
+- `cmake ... -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain-file>` (Any recent version of CMake)
+- `cmake ... --toolchain <path-to-toolchain-file>` (CMake 3.21 and newer)
+
+Sometimes people do an `include()` of their toolchain file at the top main `CMakeLists.txt` file.  Or, equivalently, they set the variables intended to be set in the toolchain file at the top of their main `CMakeLists.txt`.  I can't give you the in-depth explanation of why this is bad practice since I am still learning.  I do know that settings related to your build configuration are going to go into your CMake cache and it wants some of that information early.
+
+### Setting the Compiler, Linker, and Binutils
+The main variables that should be `set()` are:
+- `CMAKE_C_COMPILER` - This needs to be the name of the C compiler as it would be invoked on the command line.  If not in your path, it should be the full path to the compiler you wish to use.
+- `CMAKE_CXX_COMPILER` - Same as above, except for the C++ compiler.
+- `CMAKE_ASM_COMPILER` - Same as above, except for the assembler.
+
+You may also want to specify some of your binutils.  `CMAKE_OBJDUMP`, `CMAKE_OBJCOPY`, and `CMAKE_SIZE` are the most common for use when cross-compiling.
+
+> Note that setting just one component (i.e. `CMAKE_C_COMPILER`) is enough for CMake to detect the remaining binutils and add them to your cache.  This behavior does not appear to be documented.  In my experiments, CMake automatically discovers the following.
+- `CMAKE_ADDR2LINE`
+- `CMAKE_AR`
+- `CMAKE_ASM_COMPILER`
+- `CMAKE_ASM_COMPILER_AR`
+- `CMAKE_ASM_COMPILER_RANLIB`
+- `CMAKE_CXX_COMPILER`
+- `CMAKE_CXX_COMPILER_AR`
+- `CMAKE_CXX_COMPILER_RANLIB`
+- `CMAKE_C_COMPILER_AR`
+- `CMAKE_C_COMPILER_RANLIB`
+- `CMAKE_LINKER`
+- `CMAKE_NM`
+- `CMAKE_OBJCOPY`
+- `CMAKE_OBJDUMP`
+- `CMAKE_RANLIB`
+- `CMAKE_READELF`
+
+One notable absence in the above list is the `size` utility.  If you want access to this utility, it should still be `set()` alongside `CMAKE_C_COMPILER`.
+
+**[Back to top](#table-of-contents)**
+
+### Specifying the Target System and Processor
+CMake doesn't _know_ that we're cross-compiling just because we gave it a toolchain file.  After all, we might be compiling a native application using a fixed compiler version.  This is common for regulated industries.  In this case, the host and target systems are still the same.  When cross-compiling, we should `set()` the system name and processor.
+- `CMAKE_SYSTEM_NAME` - The name of the target system.  For bare-metal embedded targets, use `Generic`.
+- `CMAKE_SYSTEM_PROCESSOR` - The target processor family (e.g. `arm`, `x86_64`, `powerpc`, etc.).
+
+CMake will detect whether we are cross-compiling based on `CMAKE_SYSTEM_NAME`.  If not set, it will default to be equal to `CMAKE_HOST_SYSTEM_NAME` (e.g. `Darwin` on Mac OS).  When `CMAKE_SYSTEM_NAME` equals `CMAKE_HOST_SYSTEM_NAME`, it is a native build and CMake automatically sets `CMAKE_CROSSCOMPILING` to false.  When they are not equal, it is a cross-compile and CMake automatically sets `CMAKE_CROSSCOMPILING` to true.
+
+**[Back to top](#table-of-contents)**
+
+### Specifying the Build Configuration
+Another thing CMake wants us to do in the toolchain file is specify custom flags for our [build configurations](https://cmake.org/cmake/help/v3.23/manual/cmake-buildsystem.7.html#default-and-custom-configurations) (e.g. `-O3` for `Release` or `-g` for `Debug`).  We do this by setting certain `_INIT` [variables](https://cmake.org/cmake/help/v3.23/variable/CMAKE_LANG_FLAGS_CONFIG_INIT.html).  For example, for `Debug` and `Release` configurations for C and C++, we'd want to set the following four variables.
+- `CMAKE_C_FLAGS_DEBUG_INIT`
+- `CMAKE_CXX_FLAGS_DEBUG_INIT`
+- `CMAKE_C_FLAGS_RELEASE_INIT`
+- `CMAKE_CXX_FLAGS_RELEASE_INIT`
+
+Setting our own flags in these `_INIT` variables won't prevent CMake from appending whatever it thinks is appropriate.  For example, if we set `CMAKE_C_FLAGS_DEBUG_INIT` to `-g3`, then the actual
+ value assigned to `CMAKE_C_FLAGS_DEBUG` will be `-g3 -g`, which will be forwarded to every compile command in the `Debug` configuration.  To prevent this, we need to _override_ CMake's default behavior, which we do by setting the [`CMAKE_USER_MAKE_RULES_OVERRIDE`](https://cmake.org/cmake/help/v3.23/variable/CMAKE_USER_MAKE_RULES_OVERRIDE.html) variable.  Again, this should be done in the toolchain file.  We use `CMAKE_USER_MAKE_RULES_OVERRIDE` to specify the `.cmake` file where we `set()` all of the `_INIT` variables.
+
+Don't ask me why handling of `_INIT` variables is the way it is or why overriding them properly is so badly documented.  You would think that setting an `_INIT` variable itself is enough to override default behavior, but the documentation [warns](https://cmake.org/cmake/help/v3.23/variable/CMAKE_LANG_FLAGS_CONFIG_INIT.html) this is not the case.
+
+> CMake may prepend or append content to the value based on the environment and target platform.
+
+Anyway, now that we've specified flags for the different build configurations, we can specify the build configuration itself by setting `CMAKE_BUILD_TYPE` on the command line as follows.
+- `cmake ... -DCMAKE_BUILD_TYPE=Debug`
+
+We want to specify this on the command line because (at least when generating for `make` and `ninja`), each build results folder can only support one configuration.  Running `make` from that folder will only ever be a `Debug` build, or only ever be a `Release` build, etc.  This means that for different build configurations we need to invoke CMake multiple times to initialize different build resulsts folders.
+- `cmake -B build_debug -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain-file> -CCMAKE_BUILD_TYPE=Debug`
+- `cmake -B build_release -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain-file> -CCMAKE_BUILD_TYPE=Release`
+
+**[Back to top](#table-of-contents)**
+
+### Specifying Device Specific Flags
+
 
 ## Debugging CMake Scripts
 _Content not yet written._
