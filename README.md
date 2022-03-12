@@ -14,6 +14,7 @@ The goal of this primer is to cover some of the pain points I struggled with lea
 - [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-Linker-and-binutils)
 - [Specifying the Target System and Processor](#specifying-the-target-system-and-processor)
 - [Specifying the Build Configuration](#specifying-the-build-configuration)
+- [Debugging CMake Scripts](#debugging-cmake-scripts)
 
 ## Motivation for CMake
 Ugh, what's this?  Yet another build system?  Is this just another _hot new thing_ that everyone is going to forget about in 5 years?  Why should _I_ learn this?  What's in it _for me_?
@@ -199,17 +200,26 @@ Don't ask me why handling of `_INIT` variables is the way it is or why overridin
 Anyway, now that we've specified flags for the different build configurations, we can specify the build configuration itself by setting `CMAKE_BUILD_TYPE` on the command line as follows.
 - `cmake ... -DCMAKE_BUILD_TYPE=Debug`
 
-We want to specify this on the command line because (at least when generating for `make` and `ninja`), each build results folder can only support one configuration.  Running `make` from that folder will only ever be a `Debug` build, or only ever be a `Release` build, etc.  This means that for different build configurations we need to invoke CMake multiple times to initialize different build resulsts folders.
+We want to specify this on the command line because (at least when generating for `make` and `ninja`), each build output folder can only support one configuration.  Running `make` from that folder will only ever be a `Debug` build, or only ever be a `Release` build, etc.  This means that for different build configurations we need to invoke CMake multiple times to initialize different build resulsts folders.
 - `cmake -B build_debug -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain-file> -CCMAKE_BUILD_TYPE=Debug`
 - `cmake -B build_release -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain-file> -CCMAKE_BUILD_TYPE=Release`
 
 **[Back to top](#table-of-contents)**
 
-### Specifying Device Specific Flags
-
-
 ## Debugging CMake Scripts
-_Content not yet written._
+It can be difficult to know what's happening in a CMake script.  When things aren't working correctly, we need some tools to give us visibility.  The bottom line with any CMake script is knowing what compiler (and linker and assembler) commands are being generated.  We can get the full list of compiler commands by adding one very simple statement to our top-level `CMakeLists.txt`.
+```
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+```
+This will cause CMake to generate a `compile_commands.json` file in your build output folder.  This can be used to verify the correctness of flags, include paths, and so forth for all compilation units.
+
+Another problem is knowing all the variables that exist and what they're set to.  The global property `_variableNames` can be used to get a list of variable names, which can then be iterated.  This [Stack Overflow post](https://stackoverflow.com/questions/9298278/cmake-print-out-all-accessible-variables-in-a-script) shows how to get the list, sort it, and then iterate over it printing each element.
+
+Finally, we may want to know all of the properties on a target.  This will let us know things like compile options, include paths, and source file list being used for that target.  Again, [Stack Overflow](https://stackoverflow.com/questions/32183975/how-to-print-all-the-properties-of-a-target-in-cmake) demonstrates how to do this.
+
+When it comes to utilities like printing all variables or all properties, I recommend making functions for them and putting them in a debug module.  That way, they can stay out of your main code base and are simply ready when you need them.
+
+**[Back to top](#table-of-contents)**
 
 -----
 Copyright &copy; 2022 Aaron Fontaine
