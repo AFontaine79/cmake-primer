@@ -4,8 +4,6 @@ The goal of this primer is to cover some of the pain points I struggled with lea
 
 ## Table of Contents
 
-- [CMake Primer](#cmake-primer)
-- [Table of Contents](#table-of-contents)
 - [Motivation for CMake](#motivation-for-cmake)
 - [CMake - The 10,000 Foot View](#cmake---the-10000-foot-view)
 - [Prereqs](#prereqs)
@@ -13,9 +11,9 @@ The goal of this primer is to cover some of the pain points I struggled with lea
 - [Targets and Properties](#targets-and-properties)
 - [Target Link Libraries](#target-link-libraries)
 - [Toolchain Files](#toolchain-files)
-  - [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-linker-and-binutils)
-  - [Specifying the Target System and Processor](#specifying-the-target-system-and-processor)
-  - [Specifying the Build Configuration](#specifying-the-build-configuration)
+- [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-linker-and-binutils)
+- [Specifying the Target System and Processor](#specifying-the-target-system-and-processor)
+- [Specifying the Build Configuration](#specifying-the-build-configuration)
 - [Debugging CMake Scripts](#debugging-cmake-scripts)
 
 ## Motivation for CMake
