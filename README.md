@@ -11,7 +11,7 @@ The goal of this primer is to cover some of the pain points I struggled with lea
 - [Targets and Properties](#targets-and-properties)
 - [Target Link Libraries](#target-link-libraries)
 - [Toolchain Files](#toolchain-files)
-- [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-Linker-and-binutils)
+- [Setting the Compiler, Linker, and Binutils](#setting-the-compiler-linker-and-binutils)
 - [Specifying the Target System and Processor](#specifying-the-target-system-and-processor)
 - [Specifying the Build Configuration](#specifying-the-build-configuration)
 - [Debugging CMake Scripts](#debugging-cmake-scripts)
@@ -21,7 +21,7 @@ Ugh, what's this?  Yet another build system?  Is this just another _hot new thin
 
 To understand CMake, we need to understand the problems it's trying to solve.  As pointed out by Hayt in [this Stack Overflow thread](https://stackoverflow.com/questions/40083642/why-do-we-need-cmake), "building things in C++ on different platforms is a mess currently."  That is one of CMake's main selling points, that it's cross-platform.  CMake was started by Bill Hoffman [in response to the need for a cross-platform build environment](https://cmake.org/overview/).
 
-Another issues is that Makefiles on their own [kinda sorta suck](https://dmitryfrank.com/blog/2016/1211_i_am_tired_of_makefiles).  To really be useful they need to be used together with the Unix configure tool or GNU's autoconf, but that's not very portable.  This is another selling point for CMake; it pulls in the configuration functionality.  Running CMake automatically performs the configure stage.
+Another issue is that Makefiles on their own [kinda sorta suck](https://dmitryfrank.com/blog/2016/1211_i_am_tired_of_makefiles).  To really be useful they need to be used together with the Unix configure tool or GNU's autoconf, but that's not very portable.  This is another selling point for CMake; it pulls in the configuration functionality.  Running CMake automatically performs the configure stage.
 
 Finally, the world of embedded development is quickly reaching an impasse.  Forget yet another build system.  What I really don't want is _yet another IDE_.  I don't understand why it is that every vendor feels the need to spin their own version of Eclipse when at the end of the day its all just variations of the same wrapper around GCC.  I think there's still this expectation in embedded development that your editor _is_ your build tool.  [Wrong wrong wrong!](https://blog.codinghorror.com/the-f5-key-is-not-a-build-process/)  These are separate concepts.  The build system should be standardizable, codifiable, executable from the command line, and repeatable across machines and from CI (cloud-based or local).  As far as the editor, you can use Notepad for all I care, as long as it doesn't affect the build.  And yes, you _can_ use VS Code and Eclipse as standalone editors and debuggers, _**as long as it doesn't affect the build**_.
 
@@ -62,7 +62,7 @@ First, all variables are treated the same.  That is to say, derefencing a variab
 Second, as far as function arguments are concerned, `;`s are just as good a separator as space.  The [language specification for command invocations](https://cmake.org/cmake/help/v3.23/manual/cmake-language.7.html#command-invocations) would not have you believe this.  In fact, that definition seems to deny that `;` can be an argument separator.  Read carefully the [documentation for unquoted arguments](https://cmake.org/cmake/help/v3.23/manual/cmake-language.7.html#unquoted-argument).  It says
 > Both Escape Sequences and Variable References are evaluated. The resulting value is divided in the same way Lists divide into elements. Each non-empty element is given to the command invocation as an argument. Therefore an unquoted argument may be given to a command invocation as zero or more arguments.
 
-Note these statements: _The resulting value is divided in the same way lists divide into elements._ ...and... _Each non-empty element is given to the command invocation as an argument._  So, in other words, a dereferenced list variable will be separated into separate elements first and then each of these will be given to the function as a separate argument.  But, here's the thing... _you don't even need to derference a variable to accomplish this behavior_.  The following two invocations of `foo()` are equivalent.
+Note these statements: _The resulting value is divided in the same way lists divide into elements._ ...and... _Each non-empty element is given to the command invocation as an argument._  So, in other words, a dereferenced list variable will be separated into separate elements first and then each of these will be given to the function as a separate argument.  But, here's the thing... _you don't even need to dereference a variable to accomplish this behavior_.  The following two invocations of `foo()` are equivalent.
 
 ```
 function(foo a b c)
@@ -175,7 +175,7 @@ One notable absence in the above list is the `size` utility.  If you want access
 **[Back to top](#table-of-contents)**
 
 ### Specifying the Target System and Processor
-CMake doesn't _know_ that we're cross-compiling just because we gave it a toolchain file.  After all, we might be compiling a native application using a fixed compiler version.  This is common for regulated industries.  In this case, the host and target systems are still the same.  When cross-compiling, we should `set()` the system name and processor.
+CMake doesn't _know_ that we're cross-compiling just because we gave it a toolchain file.  After all, we might be compiling a native application using a specific compiler version.  This is common for regulated industries.  In this case, the host and target systems are still the same.  When cross-compiling, we should `set()` the system name and processor.
 - `CMAKE_SYSTEM_NAME` - The name of the target system.  For bare-metal embedded targets, use `Generic`.
 - `CMAKE_SYSTEM_PROCESSOR` - The target processor family (e.g. `arm`, `x86_64`, `powerpc`, etc.).
 
